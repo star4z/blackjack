@@ -42,6 +42,8 @@ fun main() {
     while (!gameEnded) {
         val amountToBet = readLine()?.toInt()
 
+        val card1 = dealCard()
+        val card2 = dealCard()
     }
 }
 
