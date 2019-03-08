@@ -39,12 +39,16 @@ fun getCard(i: Int): Card {
 }
 
 val getAmount = "Enter an amount to bet (between \$5 and \$20):"
-val badAmount = "Entered amount was not between $5 and $20."
+val badAmount = "Entered amount was not a number between $5 and $20."
 
 val getOption = "What will you do?\n1. Stand\n2. Hit"
 val badOption = "Entry was not a valid option."
 
-data class Card(val faceValue: String, val suite: String, val value: Int)
+data class Card(val faceValue: String, val suite: String, val value: Int) {
+    override fun toString(): String {
+        return "$faceValue of $suite"
+    }
+}
 
 fun main() {
     val gameEnded = false
@@ -59,10 +63,13 @@ fun main() {
     while (!gameEnded) {
         var pot = 0
         for (i in playersCards.keys) {
+            println("You have $${money[i]}.")
             val amountToBet = getValidInput(getAmount, badAmount) { it in 5..20 }
-
+            //Quitting?
             money[i] = money[i]!!.minus(amountToBet)
             pot += amountToBet
+
+            //Dealer adds money?
 
             playersCards[i]!!.add(dealCard())
             playersCards[i]!!.add(dealCard())
@@ -72,16 +79,16 @@ fun main() {
 
             var option = 2
             while (option == 2) {
-                println("Your cards are ${playersCards[i]} and your total is ${playersCards[i]!!.getTotal()}")
-                println("The dealer shows ${dealerCards[dealerCards.lastIndex]}")
-                println("What will you do?\n1. Stand\n2. Hit")
+                println("Your cards are ${playersCards[i]} and your total is ${playersCards[i]!!.getTotal()}.")
+                println("The dealer shows ${dealerCards[dealerCards.lastIndex]}.")
 
                 option = getValidInput(getOption, badOption) { it in 1..2 }
 
                 if (option == 2) {
-                    playersCards[i]!!.add(dealCard())
+                    val card = dealCard()
+                    println("You drew $card.")
+                    playersCards[i]!!.add(card)
                 }
-                println("Your cards are ${playersCards[i]} and your total is ${playersCards[i]!!.getTotal()}")
                 if (playersCards[i]!!.getTotal() > 21){
                     println("You have gone bust.")
                     option = 0
@@ -115,10 +122,15 @@ fun main() {
             }
         }
 
+        println("The pot size is $$pot")
         if (winners.isEmpty()){
-            println()
+            println("The dealer wins.")
         } else {
-
+            for (i in winners){
+                println("Player $i is a winner.")
+                money[i] = money[i]!! + (pot / winners.size)
+                println(money[i])
+            }
         }
     }
 }
@@ -128,7 +140,12 @@ fun getValidInput(outputString: String, incorrectString: String, conditional: (I
     var input = -1
     while (!enteredValidEntry) {
         println(outputString)
-        input = readLine()?.toInt() ?: -1
+        val next = readLine()
+        input = try {
+            next?.toInt() ?: -1
+        } catch (e: NumberFormatException) {
+            -1
+        }
 
         enteredValidEntry = conditional(input)
 
@@ -142,6 +159,7 @@ fun getValidInput(outputString: String, incorrectString: String, conditional: (I
 
 fun initDeck(numOfDecks: Int) {
     cards.clear()
+    //Shuffle deck?
     repeat(numOfDecks) {
         cards.addAll(deck)
     }
@@ -152,7 +170,7 @@ fun dealCard(): Card {
 }
 
 fun ArrayList<Card>.getCard(): Card {
-    val i = (0..size).random()
+    val i = (0 until size).random()
     val card = get(i)
     removeAt(i)
     return card
