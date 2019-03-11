@@ -1,15 +1,12 @@
 import kotlin.math.absoluteValue
 
-var money = HashMap<Int, Int>()
 val cards = ArrayList<Card>()
 
 val deck = List(52) { i -> generateCard(i) }
 
-val playersCards = HashMap<Int, ArrayList<Card>>()
-val bets = HashMap<Int, Int>()
-
-val dealerCards = ArrayList<Card>()
-var dealerMoney = 0
+val players = ArrayList<Player>()
+val eliminatedPlayers = HashSet<Int>()
+val dealer = Player(money = 0)
 
 fun generateCard(seed: Int): Card {
     val a = seed % 13
@@ -41,151 +38,197 @@ val badAiCount: (Int) -> String = { "Number of AI players must be between 1 and 
 const val getNumOfDecks = "How many decks? (Must be between 1 and 8)"
 const val badNumOfDecks = "Number of decks must be between 1 and 8."
 
-val getHandsToPlay: (Int) -> String = { "How many hands will you play? (Must be at least 1 and no more than $it)" }
-const val badHandsToPlay = "You must play at least 1 hand."
+//val getHandsToPlay: (Int) -> String = { "How many hands will you play? (Must be at least 1 and no more than $it)" }
+//const val badHandsToPlay = "You must play at least 1 hand."
 
-const val getAmount = "Enter an amount to bet (between \$5 and \$20):"
-const val badAmount = "Entered amount was not a number between $5 and $20."
+val getAmount: (Int) -> String = { "Enter an amount to bet (between \$5 and \$$it):" }
+const val badAmount = "Entered amount was not in the indicated range."
 
-const val getOption = "What will you do?\n1. Stand\n2. Hit"
+val getOption: (HashSet<Int>) -> String = {
+    "What will you do?${if (it.contains(1)) "\n" +
+            "1. Hit" else ""}${if (it.contains(2)) "\n2. Stand" else ""}${if (it.contains(3)) "\n3. Split" else ""}"
+}
 const val badOption = "Entry was not a valid option."
 
-const val HIT = 2
-const val STAND = 1
+const val HIT = 1
+const val STAND = 2
+const val SPLIT = 3
+const val maxOptions = 2
 
-data class Card(val faceValue: String, val suite: String, val identifyingValue: Int) {
+const val LOSE = 0
+const val WIN = 1
+const val PUSH = 2
+
+data class Card(val faceValue: String, val suite: String, val pipValue: Int) {
     override fun toString(): String {
         return "$faceValue of $suite"
     }
 }
 
+data class Player(
+    var money: Int = 1000,
+    val originalMoney: Int = money,
+    val cards: ArrayList<ArrayList<Card>> = ArrayList(),
+    var bet: Int = 0,
+    var lastRoundResult: Int = LOSE
+)
+
+var numOfDecks: Int = 0
+
 fun main() {
 
     val playerCount = getValidInput(getPlayerCount, badPlayerCount) { it in 1..7 }
     val aiCount = getValidInput(getAiCount(playerCount), badAiCount(playerCount)) { it in 1..playerCount }
-    val numOfDecks = getValidInput(getNumOfDecks, badNumOfDecks) { it in 1..8 }
-    val maxHands = (numOfDecks * 52) / (4 * (playerCount + 1))
-    val handsToPlay = getValidInput(getHandsToPlay(maxHands), badHandsToPlay) { it in 1..maxHands }
+    numOfDecks = getValidInput(getNumOfDecks, badNumOfDecks) { it in 1..8 }
+//    val maxHands = (numOfDecks * 52) / (4 * (playerCount + 1)) //Makes sure that you don't run out of cards
+//    val handsToPlay = getValidInput(getHandsToPlay(maxHands), badHandsToPlay) { it in 1..maxHands }
+    val handsToPlay = 100
 
-    initDeck(numOfDecks)
+    initDeck()
 
-    val lastRoundResults = HashMap<Int, Int>()
-    var handNo = 1
-
+    dealer.cards.add(ArrayList())
     for (i in 1..playerCount) {
-        playersCards[i] = ArrayList()
-        money[i] = 1000
-        bets[i] = 0
+        val player = Player()
+        players.add(player)
+        player.cards.add(ArrayList())
     }
 
+    println()
+    var roundNo = 1
 
-    while (handNo <= handsToPlay) {
-        println("Hands $handNo:")
-        for (i in playersCards.keys) {
-            println("Player $i, you have $${money[i]}.")
+    while (roundNo <= handsToPlay && eliminatedPlayers.size < players.size) {
+        println("Round no. $roundNo:")
 
-            if (lastRoundResults.containsKey(i) && lastRoundResults[i] == 3) {
-                println("Player $i, since you pushed last round, your bet of $${bets[i]} remains.")
-            } else {
-                val amountToBet = if (i < (playerCount - aiCount)) {
-                    getValidInput(getAmount, badAmount) { it in 5..20 }
+        players.forEachIndexed { i, player ->
+            val playerNumber = i + 1
+            if (!eliminatedPlayers.contains(i)) {
+                println("Player $playerNumber, you have $${player.money}.")
+
+                if (player.money < 5) {
+                    println("Player $playerNumber ran out of money, and is eliminated.")
+                    eliminatedPlayers.add(i)
                 } else {
-                    (5..20).random()
+
+                    if (player.lastRoundResult == 3) {
+                        println("Player $playerNumber, since you pushed last round, your bet of $${players[i].bet} remains.")
+                    } else {
+                        val maxAmount = if (player.money >= 20) 20 else player.money
+                        val amountToBet = if (i < (playerCount - aiCount)) {
+                            getValidInput(getAmount(maxAmount), badAmount) { it in 5..20 }
+                        } else {
+                            (5..maxAmount).random()
+                        }
+                        println("Player $playerNumber bet $$amountToBet.")
+                        player.money -= amountToBet
+                        player.bet = amountToBet
+                    }
                 }
-                println("Player $i bet $$amountToBet.")
-                money[i] = money[i]!!.minus(amountToBet)
-                bets[i] = amountToBet
+            }
+        }
+
+        if (eliminatedPlayers.size < players.size) {
+
+            players.forEachIndexed { i, player ->
+                if (!eliminatedPlayers.contains(i)) {
+                    player.cards[0].add(dealCard())
+                    player.cards[0].add(dealCard())
+                    println("Player ${i + 1} got ${player.cards[0]}.")
+                }
             }
 
-        }
+            dealer.cards[0].add(dealCard())
+            dealer.cards[0].add(dealCard())
+            println("The dealer shows ${dealer.cards[0][dealer.cards[0].lastIndex]}.")
 
-        for (i in playersCards.keys) {
-            playersCards[i]!!.add(dealCard())
-            playersCards[i]!!.add(dealCard())
+            for (i in players.indices) {
+                if (!eliminatedPlayers.contains(i)) {
+                    val playerNumber = i + 1
+                    var option = 0
+                    while (option != STAND) {
+                        val playerCards = players[i].cards[0]
+                        val total = playerCards.getTotal()
+                        println("Player $playerNumber, your cards are $playerCards and you have $total points.")
 
-            println("Player $i got ${playersCards[i]}.")
-        }
-
-        dealerCards.add(dealCard())
-        dealerCards.add(dealCard())
-        println("The dealer shows ${dealerCards[dealerCards.lastIndex]}.")
-
-        for (i in playersCards.keys) {
-            var option = 0
-            while (option != STAND) {
-                val playerCards = playersCards[i]
-                val total = playerCards!!.getTotal()
-                println("Player $i, your cards are $playerCards and you have $total points.")
-
-                if (total > 21) {
-                    println("You have gone bust.")
-                    option = STAND
-                } else if (playerCards.size == 2 && total == 21) {
-                    println("You have Blackjack.")
-                    option = STAND
-                } else {
-                    option = if (i < (playerCount - aiCount)) {
-                        getValidInput(getOption, badOption) { it in 1..2 }
-                    } else {
-                        if (playerCards.getTotal() + 5 < 16) {
-                            HIT
+                        if (total > 21) {
+                            println("Player $playerNumber, you have gone bust.")
+                            option = STAND
+                        } else if (playerCards.size == 2 && total == 21) {
+                            println("Player $playerNumber, you have Blackjack.")
+                            option = STAND
                         } else {
-                            if (evalStand(playerCards) > 0.1){
-                                HIT
+                            option = if (i < (playerCount - aiCount)) {
+                                val containsDupes = playerCards.containsDuplicates()
+                                val options = HashSet<Int>()
+                                options.add(1)
+                                options.add(2)
+                                if (playerCards.size == 2 && containsDupes) {
+                                    options.add(3)
+                                    getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                                } else {
+                                    getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                                }
                             } else {
-                                STAND
+                                if (playerCards.getTotal() < 16) {
+                                    HIT
+                                } else {
+                                    STAND
+                                }
+                            }
+                            when (option) {
+                                HIT -> {
+                                    println("Player $playerNumber hit.")
+                                    val card = dealCard()
+
+                                    println("Player $playerNumber drew $card.")
+                                    playerCards.add(card)
+                                }
+                                STAND -> println("Player $playerNumber stands.")
+                                SPLIT -> {
+                                    println("Player $playerNumber split.")
+
+                                }
                             }
                         }
                     }
-                    if (option == HIT) {
-                        println("Player $i hit.")
-                        val card = dealCard()
-
-                        println("You drew $card.")
-                        playerCards.add(card)
-                    } else if (option == STAND) {
-                        println("Player $i stands.")
-                    }
                 }
             }
+
+            println("The dealer reveals ${dealer.cards[0][dealer.cards[0].lastIndex - 1]}")
+            println("The dealer has a total of ${dealer.cards[0].getTotal()} points.")
+
+            while (dealer.cards[0].getTotal() < 16) {
+                dealer.cards[0].add(dealCard())
+                println("The dealer hit, and drew ${dealer.cards[0][dealer.cards[0].lastIndex]}.")
+                println("The dealer's now has a total of ${dealer.cards[0].getTotal()} points.")
+            }
+
+            val dealerTotal = dealer.cards[0].getTotal()
+
+            if (dealerTotal > 21) {
+                println("The dealer went bust!")
+            }
+            players.forEachIndexed { i, player ->
+                player.lastRoundResult = distributeWinnings(i)
+                player.cards.forEach { it.clear() }
+            }
+
+            roundNo++
+            dealer.cards[0].clear()
+            println()
+
         }
-
-        println("The dealer reveals ${dealerCards[dealerCards.lastIndex - 1]}")
-        println("The dealer has a total of ${dealerCards.getTotal()} points.")
-
-        while (dealerCards.getTotal() < 16) {
-            dealerCards.add(dealCard())
-            println("The dealer hit, and drew ${dealerCards[dealerCards.lastIndex]}.")
-            println("The dealer's now has a total of ${dealerCards.getTotal()} points.")
-        }
-
-        val dealerTotal = dealerCards.getTotal()
-
-        if (dealerTotal > 21) {
-            println("The dealer went bust!")
-        }
-        playersCards.keys.forEach {
-            lastRoundResults[it] = distributeWinnings(it, dealerTotal)
-            playersCards[it]!!.clear()
-
-        }
-
-        handNo++
-        dealerCards.clear()
-        println()
     }
 
-    println("The dealer ${if (dealerMoney >= 0) "made" else "lost"} $${dealerMoney.absoluteValue}.")
+    println("The dealer ${if (dealer.money >= 0) "made" else "lost"} $${dealer.money.absoluteValue}.")
 
-    for (player in playersCards.keys) {
-        val playerMoney = money[player]!! - 1000
-        println("Player $player ${if (playerMoney >= 0) "made" else "lost"} $${playerMoney.absoluteValue}.")
+    for (i in players.indices) {
+        val playerMoney = players[i].money - players[i].originalMoney
+        println("Player ${i + 1} ${if (playerMoney >= 0) "made" else "lost"} $${playerMoney.absoluteValue}.")
     }
 
 }
 
-
-fun initDeck(numOfDecks: Int) {
+fun initDeck() {
     cards.clear()
     //Shuffle deck?
     repeat(numOfDecks) {
@@ -202,46 +245,51 @@ fun evalStand(cards: ArrayList<Card>): Float {
     val sums = cards.map {
         var sum = 0
         cards.forEach {
-            sum += it.identifyingValue + hand
+            sum += it.pipValue + hand
         }
         sum
     }
-    return sums.filter { it <= 21 }.size/sums.size.toFloat()
+    return sums.filter { it <= 21 }.size / sums.size.toFloat()
 }
 
-fun distributeWinnings(playerNumber: Int, dealerTotalValue: Int): Int {
-    val playerCards = playersCards[playerNumber]
-    val totalValue = playerCards!!.getTotal()
+fun distributeWinnings(playerIndex: Int): Int {
+    if (eliminatedPlayers.contains(playerIndex)){
+        return LOSE
+    }
+    val playerNumber = playerIndex + 1
+    val playerCards = players[playerIndex].cards
+    val totalValue = playerCards[0].getTotal()
     val hands = playerCards.size - 2
+    val dealerTotalValue = dealer.cards[0].getTotal()
 
     var moneyPaid = 0
-    var returnValue = 0
+    var lastResult = LOSE
     if (totalValue == 21 && hands == 0) {
-        moneyPaid = (bets[playerNumber]!! * 2.5).toInt()
+        moneyPaid = (players[playerIndex].bet * 2.5).toInt()
         println("Player $playerNumber had Blackjack and got a payout of $$moneyPaid.")
-        returnValue = 1
+        lastResult = WIN
 
     } else if ((totalValue in (dealerTotalValue + 1)..20) or (totalValue <= 21 && dealerTotalValue > 21)) {
-        moneyPaid = bets[playerNumber]!! * 2
-        println("Player $playerNumber had a total of $totalValue and got a payout of $$moneyPaid.")
-        returnValue = 1
+        moneyPaid = players[playerIndex].bet * 2
+        println("Player $playerNumber had $totalValue points and got a payout of $$moneyPaid.")
+        lastResult = WIN
 
-    } else if (totalValue < 21 && totalValue == dealerTotalValue) {
-        println("Player $playerNumber had a push with a total of $totalValue.")
-        returnValue = 3
+    } else if (totalValue <= 21 && totalValue == dealerTotalValue) {
+        println("Player $playerNumber had a push with $totalValue points.")
+        lastResult = PUSH
 
     } else if (totalValue < dealerTotalValue) {
-        println("Player $playerNumber lost with a score of $totalValue, which was less than the dealer's score.")
+        println("Player $playerNumber lost with $totalValue points, which was less than the dealer's score.")
 
     } else {
-        println("Player $playerNumber went bust, with a total of $totalValue.")
+        println("Player $playerNumber went bust, with $totalValue points.")
 
     }
 
-    money[playerNumber] = money[playerNumber]!! + moneyPaid
-    dealerMoney += -moneyPaid + bets[playerNumber]!!
+    players[playerIndex].money += moneyPaid
+    dealer.money += -moneyPaid + players[playerIndex].bet
 
-    return returnValue
+    return lastResult
 }
 
 fun getValidInput(outputString: String, incorrectString: String, conditional: (Int) -> Boolean): Int {
@@ -268,22 +316,27 @@ fun getValidInput(outputString: String, incorrectString: String, conditional: (I
 
 
 fun ArrayList<Card>.getCard(): Card {
-    val i = (0 until size).random()
-    val card = get(i)
-    removeAt(i)
-    return card
+    return if (size > 0) {
+        val i = (0 until size).random()
+        val card = get(i)
+        removeAt(i)
+        card
+    } else {
+        initDeck()
+        getCard()
+    }
 }
 
 fun ArrayList<Card>.getTotal(): Int {
     var total = 0
     var aces = 0
     for (card in this) {
-        total += if (card.identifyingValue > 10) {
+        total += if (card.pipValue > 10) {
             10
         } else {
-            card.identifyingValue
+            card.pipValue
         }
-        if (card.identifyingValue == 1) {
+        if (card.pipValue == 1) {
             aces++
         }
     }
@@ -295,4 +348,18 @@ fun ArrayList<Card>.getTotal(): Int {
         }
     }
     return total
+}
+
+fun ArrayList<Card>.containsDuplicates(): Boolean {
+    var seenDupes = false
+    val seenValues = HashSet<Int>()
+    forEach {
+        val value = if (it.pipValue > 10) 10 else it.pipValue //all 10-value cards are interchangeable
+        if (seenValues.contains(value)) {
+            seenDupes = true
+        } else {
+            seenValues.add(value)
+        }
+    }
+    return seenDupes
 }
