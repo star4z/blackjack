@@ -80,8 +80,6 @@ fun main() {
     val playerCount = getValidInput(getPlayerCount, badPlayerCount) { it in 1..7 }
     val aiCount = getValidInput(getAiCount(playerCount), badAiCount(playerCount)) { it in 1..playerCount }
     numOfDecks = getValidInput(getNumOfDecks, badNumOfDecks) { it in 1..8 }
-//    val maxHands = (numOfDecks * 52) / (4 * (playerCount + 1)) //Makes sure that you don't run out of cards
-//    val handsToPlay = getValidInput(getHandsToPlay(maxHands), badHandsToPlay) { it in 1..maxHands }
     val handsToPlay = 100
 
     initDeck()
@@ -150,77 +148,79 @@ fun main() {
                     while (handNo < numHands) {
                         while (option != STAND) {
 
-                            val playerCards = players[i].cards[handNo]
+                            with(players[i].cards[handNo]) {
 
-                            var aceSplit = false
-                            if (playerCards.size == 1) {
-                                aceSplit = playerCards[0].pipValue == 1
+                                var aceSplit = false
+                                if (size == 1) {
+                                    aceSplit = component1().pipValue == 1
 
-                                val newCard = dealCard()
-                                println("Player $playerNumber was dealt $newCard.")
-                                playerCards.add(newCard)
-                            }
-
-                            val total = playerCards.getTotal()
-                            println("Player $playerNumber, your cards are $playerCards and you have $total points.")
-
-
-
-                            if (total > 21) {
-                                println("Player $playerNumber, you have gone bust.")
-                                option = STAND
-                            } else if (playerCards.size == 2 && total == 21) {
-                                println("Player $playerNumber, you have Blackjack.")
-                                option = STAND
-                            } else {
-                                val canSplit =
-                                    playerCards.size == 2 && playerCards.containsDuplicates() && players[i].cards.size < 4
-                                option = if (aceSplit) {
-                                    println("Since player $playerNumber had an ace split, they must stand.")
-                                    STAND
-                                } else if (i < (playerCount - aiCount)) {
-                                    val options = HashSet<Int>()
-                                    options.add(1)
-                                    options.add(2)
-                                    if (canSplit) {
-                                        options.add(3)
-                                        getValidInput(getOption(options), badOption) { it in 1..maxOptions }
-                                    } else {
-                                        getValidInput(getOption(options), badOption) { it in 1..maxOptions }
-                                    }
-                                } else {
-                                    when {
-                                        canSplit -> SPLIT
-                                        playerCards.getTotal() < 16 -> HIT
-                                        else -> STAND
-                                    }
+                                    val newCard = dealCard()
+                                    println("Player $playerNumber was dealt $newCard.")
+                                    add(newCard)
                                 }
-                                when (option) {
-                                    HIT -> {
-                                        println("Player $playerNumber hit.")
-                                        val card = dealCard()
 
-                                        println("Player $playerNumber received $card.")
-                                        playerCards.add(card)
+                                val total = getTotal()
+                                println("Player $playerNumber, your cards are $this and you have $total points in hand ${handNo + 1}.")
+
+
+
+                                if (total > 21) {
+                                    println("Player $playerNumber, you have gone bust.")
+                                    option = STAND
+                                } else if (size == 2 && total == 21) {
+                                    println("Player $playerNumber, you have Blackjack.")
+                                    option = STAND
+                                } else {
+                                    val canSplit = size == 2 && containsDuplicates() && players[i].cards.size < 4
+                                    option = if (aceSplit) {
+                                        println("Since player $playerNumber had an ace split, they must stand.")
+                                        STAND
+                                    } else if (i < (playerCount - aiCount)) {
+                                        val options = HashSet<Int>()
+                                        options.add(1)
+                                        options.add(2)
+                                        if (canSplit) {
+                                            options.add(3)
+                                            getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                                        } else {
+                                            getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                                        }
+                                    } else {
+                                        when {
+                                            canSplit -> SPLIT
+                                            getTotal() < 16 -> HIT
+                                            else -> STAND
+                                        }
                                     }
-                                    STAND -> println("Player $playerNumber stands.")
-                                    SPLIT -> {
-                                        println("Player $playerNumber split.")
-                                        val cardToMove = players[i].cards[handNo].removeAt(1)
-                                        players[i].cards.add(ArrayList())
-                                        players[i].cards[handNo + 1].add(cardToMove)
+                                    when (option) {
+                                        HIT -> {
+                                            println("Player $playerNumber hit.")
+                                            val card = dealCard()
 
-                                        println(
-                                            "Player $playerNumber placed an equal bet of ${players[i].bet[handNo]}"
-                                                    + " on their next hand."
-                                        )
-                                        players[i].bet.add(players[i].bet[handNo])
-                                        players[i].money -= players[i].bet[handNo + 1]
+                                            println("Player $playerNumber received $card.")
+                                            add(card)
+                                        }
+                                        STAND -> println("Player $playerNumber stands.")
+                                        SPLIT -> {
+                                            println("Player $playerNumber split.")
+                                            val cardToMove = players[i].cards[handNo].removeAt(1)
+                                            players[i].cards.add(ArrayList())
+                                            players[i].cards[handNo + 1].add(cardToMove)
+
+                                            println(
+                                                "Player $playerNumber placed an equal bet of ${players[i].bet[handNo]}"
+                                                        + " on their next hand."
+                                            )
+                                            players[i].bet.add(players[i].bet[handNo])
+                                            players[i].money -= players[i].bet[handNo + 1]
+                                        }
+                                        else -> {
+                                        }
                                     }
                                 }
                             }
                         }
-                        println("Player $playerNumber has cards ${players[i].cards}")
+//                        println("Player $playerNumber's cards are ${players[i].cards}")
                         option = 0
                         handNo++
                         numHands = players[i].cards.size
@@ -234,7 +234,7 @@ fun main() {
             while (dealer.cards[0].getTotal() < 16) {
                 dealer.cards[0].add(dealCard())
                 println("The dealer hit, and drew ${dealer.cards[0][dealer.cards[0].lastIndex]}.")
-                println("The dealer's now has a total of ${dealer.cards[0].getTotal()} points.")
+                println("The dealer now has a total of ${dealer.cards[0].getTotal()} points.")
             }
 
             val dealerTotal = dealer.cards[0].getTotal()
@@ -244,8 +244,10 @@ fun main() {
             }
             players.forEachIndexed { i, player ->
                 player.lastRoundResult = distributeWinnings(i)
-                player.cards.clear()
-                player.cards.add(ArrayList())
+                player.cards.apply {
+                    clear()
+                    add(ArrayList())
+                }
             }
 
             roundNo++
@@ -254,6 +256,8 @@ fun main() {
 
         }
     }
+
+    players.forEach { dealer.money += it.originalMoney - it.money }
 
     println("The dealer ${if (dealer.money >= 0) "made" else "lost"} $${dealer.money.absoluteValue}.")
 
@@ -266,10 +270,12 @@ fun main() {
 
 fun initDeck() {
     cards.clear()
-    //Shuffle deck?
     repeat(numOfDecks) {
         cards.addAll(deck)
     }
+
+    //Remove any cards that already exist in players' hands.
+    players.forEach { it.cards.forEach{ cards -> cards.forEach { card -> cards.remove(card) }} }
 }
 
 fun dealCard(): Card {
@@ -307,15 +313,14 @@ fun distributeWinnings(playerIndex: Int): Int {
             lastResult = PUSH
 
         } else if (totalValue < dealerTotalValue) {
-            println("Player $playerNumber lost with $totalValue points, which was less than the dealer's score.")
+            println("Player $playerNumber lost ${players[playerIndex].bet[i]} with $totalValue points, which was less than the dealer's score.")
 
         } else {
-            println("Player $playerNumber went bust, with $totalValue points.")
+            println("Player $playerNumber went bust, with $totalValue points, for a loss of ${players[playerIndex].bet[i]}.")
 
         }
 
         players[playerIndex].money += moneyPaid
-        dealer.money += -moneyPaid + players[playerIndex].bet[i]
     }
 
     return lastResult
