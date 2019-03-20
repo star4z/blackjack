@@ -3,8 +3,8 @@ import kotlin.math.absoluteValue
 const val getPlayerCount = "How many players? (Must be between 1 and 7)"
 const val badPlayerCount = "Number of players must be between 1 and 7."
 
-val getAiCount: (Int) -> String = { "How many players are AI? (Must be between 1 and $it)" }
-val badAiCount: (Int) -> String = { "Number of AI players must be between 1 and $it" }
+val getAiCount: (Int) -> String = { "How many players are AI? (Must be between 0 and $it)" }
+val badAiCount: (Int) -> String = { "Number of AI players must be between 0 and $it" }
 
 const val getNumOfDecks = "How many decks? (Must be between 1 and 8)"
 const val badNumOfDecks = "Number of decks must be between 1 and 8."
@@ -21,7 +21,7 @@ const val badOption = "Entry was not a valid option."
 const val HIT = 1
 const val STAND = 2
 const val SPLIT = 3
-const val maxOptions = 2
+//const val maxOptions = 2
 
 const val LOSE = 0
 const val WIN = 1
@@ -32,7 +32,7 @@ var numOfDecks: Int = 0
 
 fun main() {
     val playerCount = getValidInput(getPlayerCount, badPlayerCount) { it in 1..7 }
-    val aiCount = getValidInput(getAiCount(playerCount), badAiCount(playerCount)) { it in 1..playerCount }
+    val aiCount = getValidInput(getAiCount(playerCount), badAiCount(playerCount)) { it in 0..playerCount }
     numOfDecks = getValidInput(getNumOfDecks, badNumOfDecks) { it in 1..8 }
 
     val game = Game(playerCount, aiCount, numOfDecks)
@@ -74,6 +74,7 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
 
         while (roundNo <= handsToPlay && eliminatedPlayers.size < players.size) {
             println("Round no. $roundNo:")
+            println("=========================================================")
 
             determineBets(playerCount, aiCount)
 
@@ -118,6 +119,13 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
     private fun dealCard(): Card {
         return cards.getCard(this)
     }
+//
+//    private fun dealCard(): Card {
+//        val cardNumToDeal = getValidInput("Enter a card to generate (0-51): ", "Invalid card") { it in (0..51) }
+//        val cardToDeal = generateCard(cardNumToDeal)
+//        println("Generated $cardToDeal.")
+//        return cardToDeal
+//    }
 
     private fun determineBets(playerCount: Int, aiCount: Int) {
         players.forEachIndexed { i, player ->
@@ -156,7 +164,7 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
                 player.cards[0].apply {
                     add(dealCard())
                     add(dealCard())
-                    println("Player ${i + 1} got ${this.niceToString()}.")
+                    println("Player ${i + 1} got ${this.niceToString()} (${this.getTotal()} pts).")
                 }
             }
         }
@@ -185,7 +193,6 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
         var numHands = players[i].cards.size
         while (handNo < numHands) {
             playHand(i, handNo)
-//          println("Player $playerNumber's cards are ${players[i].cards}")
             handNo++
             numHands = players[i].cards.size
         }
@@ -194,17 +201,21 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
     private fun playHand(i: Int, handNo: Int) {
         val playerNumber = i + 1
         var option = 0
+        with(players[i].cards[handNo]) {
 
-        while (option != STAND) {
-
-            with(players[i].cards[handNo]) {
+            while (option != STAND) {
+                println(
+                    "Player $playerNumber, ${if (players[i].cards.size > 1) "in hand ${handNo + 1} " else ""}you " +
+                            "have ${this.niceToString()} (${getTotal()} pts)."
+                )
                 option = determineOption(players[i], playerNumber, handNo)
                 option.run { handleOption(this, i, playerNumber, handNo) }
 
-                val total = getTotal()
-                println("Player $playerNumber, ${if (players[i].cards.size > 1) "in hand ${handNo + 1} " else ""}you " +
-                        "have ${this.niceToString()}, for a total of $total points.")
             }
+            println(
+                "Player $playerNumber, ${if (players[i].cards.size > 1) "in hand ${handNo + 1} " else ""}you " +
+                        "have ${this.niceToString()} (${getTotal()} pts)."
+            )
         }
     }
 
@@ -229,9 +240,9 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
                     options.add(2)
                     if (canSplit) {
                         options.add(3)
-                        getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                        getValidInput(getOption(options), badOption) { it in 1..3 }
                     } else {
-                        getValidInput(getOption(options), badOption) { it in 1..maxOptions }
+                        getValidInput(getOption(options), badOption) { it in 1..2 }
                     }
                 } else {
                     when {
@@ -254,6 +265,8 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
                 val newCard = dealCard()
                 println("Player $playerNumber was dealt $newCard.")
                 player.cards[handNo].add(newCard)
+
+                println("Player $playerNumber has ${this.niceToString()} (${getTotal()} pts).")
             }
         }
 
@@ -277,13 +290,11 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
                 players[i].cards[handNo + 1].add(cardToMove)
 
                 println(
-                    "Player $playerNumber placed an equal bet of ${players[i].bet[handNo]}"
+                    "Player $playerNumber placed an equal bet of $${players[i].bet[handNo]}"
                             + " on their next hand."
                 )
                 players[i].bet.add(players[i].bet[handNo])
                 players[i].money -= players[i].bet[handNo + 1]
-            }
-            else -> {
             }
         }
     }
@@ -334,18 +345,20 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
 
     private fun onRoundFinished() {
         with(dealer.cards[0]) {
-            println("The dealer reveals ${last()}")
-            println("The dealer has a total of ${getTotal()} points.")
+            println("The dealer reveals ${get(lastIndex - 1)}")
+            println("The dealer has ${this.niceToString()} (${getTotal()} pts).")
 
             while (getTotal() < 16) {
                 add(dealCard())
                 println("The dealer hit, and drew ${last()}.")
-                println("The dealer now has a total of ${getTotal()} points.")
+                println("The dealer now has ${getTotal()} points.")
             }
 
             if (getTotal() > 21) {
                 println("The dealer went bust!")
             }
+
+            println("---------------------------------------------------------")
 
             players.forEachIndexed { i, player ->
                 player.lastRoundResult = distributeWinnings(i)
@@ -373,6 +386,10 @@ class Game(private val playerCount: Int, private val aiCount: Int, private val n
 
 }
 
+/**
+ * Given a number, generates a card.
+ * Inputting the numbers 0 through 51 will produce each card exactly once.
+ */
 fun generateCard(seed: Int): Card {
     val a = seed % 13
     val b = seed / 13
@@ -401,7 +418,13 @@ fun getValidInput(outputString: String, incorrectString: String, conditional: (I
         println(outputString)
         val next = readLine()
         input = try {
-            next?.toInt() ?: -1
+            next?.let {
+                if (next.contains("$")) {
+                    next.substring(next.indexOf("$") + 1).trim().toInt()
+                } else {
+                    next.toInt()
+                }
+            } ?: -1
         } catch (e: NumberFormatException) {
             -1
         }
@@ -416,68 +439,3 @@ fun getValidInput(outputString: String, incorrectString: String, conditional: (I
     return input
 }
 
-fun ArrayList<Card>.getCard(game: Game): Card {
-    return if (size > 0) {
-        val i = (0 until size).random()
-        val card = get(i)
-        removeAt(i)
-        card
-    } else {
-        game.initDeck()
-        getCard(game)
-    }
-}
-
-fun ArrayList<Card>.getTotal(): Int {
-    var total = 0
-    var aces = 0
-    for (card in this) {
-        total += if (card.pipValue > 10) {
-            10
-        } else {
-            card.pipValue
-        }
-        if (card.pipValue == 1) {
-            aces++
-        }
-    }
-
-    //if adding the ace keeps the total under 21, ace = 11
-    for (i in 1..aces) {
-        if (total + 10 <= 21) {
-            total += 10
-        }
-    }
-    return total
-}
-
-fun ArrayList<Card>.containsDuplicates(): Boolean {
-    var seenDupes = false
-    val seenValues = HashSet<Int>()
-    forEach {
-        val value = if (it.pipValue > 10) 10 else it.pipValue //all 10-value cards are interchangeable
-        if (seenValues.contains(value)) {
-            seenDupes = true
-        } else {
-            seenValues.add(value)
-        }
-    }
-    return seenDupes
-}
-
-//Can't override toString without extending class
-fun ArrayList<Card>.niceToString(): String {
-    var s = ""
-    when (size) {
-        1 -> s += "${component1()}"
-        2 -> s += "${component1()} and ${component2()}"
-        else -> forEachIndexed { index, card ->
-            s += if (index == lastIndex) {
-                "and $card"
-            } else {
-                "$card, "
-            }
-        }
-    }
-    return s
-}
